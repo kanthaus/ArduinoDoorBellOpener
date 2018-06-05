@@ -23,8 +23,8 @@ At best, try with available power supplies what works with yours.
 Typically, door bell systems run with 8-16V AC voltage.
 Still, most should work fine with DC but the current draw might rise when fed with DC (as they have a higher AC resistance due to the inductive coil allowing to open the door).
 
-Mine works beginning from approximately 2.5V DC and draws about 350mA.
-That translates to about 1W of power, which seems alright.
+Mine works beginning from approximately 3.5V DC and draws about 400mA.
+That translates to about 1.5W of power, which seems alright.
 At 12V DC, the current draw is nearly 1.5A, meaning the small door opener would generate heat of almost 20W which would break it within a couple of seconds.
 
 I decided to use a small step down module with an enable pin to power the door opener:
@@ -70,3 +70,12 @@ So the circuit becomes very simple:
 Being fully optional, there can be an indicator light next to the keypad.
 As we already have a common ground there, we just use another IO pin of the arduino to connect an LED with a resistor of 220 to 470 Ohms in series.
 
+
+### Take aways for Tiny85 boards (e.g. Digispark clones)
+
+There are these nice arduino modules that come as digispark clones: A tiny85 on a pcb that can be plugged directly into USB.
+
+These boards have some drawbacks:
+
+* Often, the clones do not have the reset pin disabled. Notice resets of your controller when applying low voltage to P(B)5? PB5 does not work in software? Use an ISP programmer to disable the reset pin functionality. Careful: You will also lose further ISP access.
+* The USB Pins P3/P4 have a Zener diode to GND. P3 has an additional Pullup of 1.5k to Vcc. Keep this in mind when designing your hardware connections. In practice, don't use P4 with the internal pullups as they don't manage to pull the pin high.
