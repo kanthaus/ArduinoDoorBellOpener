@@ -2,17 +2,24 @@
 
 #define PIN_KEY1 2
 #define PIN_KEY2 3
-#define PIN_KEY3 4
+#define PIN_KEY3 4  /* PB4 pullup too weak against USB D+ shottky - either use external strong pullup or don't use this key */
 #define PIN_KEY4 5
 #define PIN_LED 1
 #define PIN_OPENER 0
 
+#define DISABLE_KEY3
+
+#define KEY_MASK 0x0F
+#ifdef DISABLE_KEY3
+#define KEY_MASK 0x0B
+#endif
+
 /* define the keys that are expected to be pressed as a bitfield e.g. the key state has to equal the values in the array sequentially */
-const uint8_t codeKeys[] = {(1 << 0), (1 << 0) | (1 << 1), (1 << 3), (1 << 2), 0};
+const uint8_t codeKeys[] = {(1 << 0), (1 << 0) | (1 << 1), (1 << 3), (1 << 1), 0};
 /* define the sample points in milliseconds. Sampling begings when the first key is read and then works sequentially expecting codeKeys[n] codeSampleIntervals[n] milliseconds after the previous sample. */
 /* sampling is initially triggered by detecting any key action. */
 /* To not allow guessing individual digits of the code, sampling time is always fixed to the sum of codeSampleIntervals[0..N-1] */
-const uint16_t codeSampleIntervals[] = {500, 1000, 1000, 1000, 1000};
+const uint16_t codeSampleIntervals[] = {1000, 2000, 2000, 2000, 2000};
 
 void setActiveHigh(uint8_t pin, boolean isOn)
 {
@@ -58,10 +65,12 @@ void loop() {
   static uint8_t state = ST_IDLE;
 
   unsigned long currentTime = millis();
+
+  static unsigned long nextTimeLed;
+  static uint8_t ledState;
   /* LED management */
   {
-    static unsigned long nextTimeLed;
-    static uint8_t ledState;
+    
     if(currentTime > nextTimeLed) {
       ledState = !ledState;
       setLed(ledState);
@@ -69,13 +78,13 @@ void loop() {
         if(ledState) {
           nextTimeLed += 100;
         } else {
-          nextTimeLed += 900;
+          nextTimeLed += 2900;
         }
       } else if(state == ST_SAMPLING) {
         if(ledState) {
-          nextTimeLed += 500;
+          nextTimeLed += 1000;
         } else {
-          nextTimeLed += 500;
+          nextTimeLed += 1000;
         }
       } else if(state == ST_OPEN) {
         if(ledState) {
@@ -92,14 +101,21 @@ void loop() {
     static uint8_t codePotentiallyCorrect;
     static uint8_t expectCodeIndex;
     if(currentTime > nextKeySamplePoint) {
-      uint8_t keysPressed = digitalRead(PIN_KEY1) | (digitalRead(PIN_KEY2) << 1) | (digitalRead(PIN_KEY3) << 2) | (digitalRead(PIN_KEY4) << 3);
-      keysPressed = (~keysPressed) & 0x0F;
+      uint8_t keysPressed = digitalRead(PIN_KEY1) | (digitalRead(PIN_KEY2) << 1) | (digitalRead(PIN_KEY4) << 3);
+      #ifndef DISABLE_KEY3
+      /* Workaround against dumb hardware design... */
+      keysPressed |= (digitalRead(PIN_KEY3) << 2);
+      #endif
+      keysPressed = (~keysPressed) & KEY_MASK;
       switch(state) {
         case ST_IDLE:
           if(keysPressed) {
             state = ST_SAMPLING;
             expectCodeIndex = 0;
             codePotentiallyCorrect = 1;
+            /* turn LED on synchronously to sampling intervals */
+            nextTimeLed = currentTime;
+            ledState = 0;
             nextKeySamplePoint = currentTime + codeSampleIntervals[0];
           } else {
             nextKeySamplePoint += 100;
